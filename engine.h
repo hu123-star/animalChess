@@ -1,23 +1,16 @@
 ﻿#pragma once
-#include <string>
+#include <cstdint>
 #include <vector>
 #include <array>
+
+constexpr int BOARD_ROWS = 7;
+constexpr int BOARD_COLS = 9;
+constexpr int BOARD_CELL_COUNT = 63;
 
 constexpr int BOARD_RANK_TOP = 3;
 constexpr int BOARD_RANK_BOTTOM = 9;
 constexpr int BOARD_FILE_LEFT = 3;
 constexpr int BOARD_FILE_RIGHT = 11;
-
-enum AnimalType {
-    ANIMAL_ELEPHANT = 0,
-    ANIMAL_LION = 1,
-    ANIMAL_TIGER = 2,
-    ANIMAL_LEOPARD = 3,
-    ANIMAL_WOLF = 4,
-    ANIMAL_DOG = 5,
-    ANIMAL_CAT = 6,
-    ANIMAL_MOUSE = 7
-};
 
 enum TerrainType {
     TERRAIN_LAND = 0,
@@ -28,20 +21,15 @@ enum TerrainType {
     TERRAIN_BLACK_DEN = 5
 };
 
-enum MoveResult {
-    MOVE_RES_NONE = 0,
-    MOVE_RES_SELECT,
-    MOVE_RES_MOVED,
-    MOVE_RES_ILLEGAL,
-    MOVE_RES_WIN,
-    MOVE_RES_LOSS
+#pragma pack(push, 1)
+struct MsgBoardSnapshot {
+    uint8_t gameStatus;
+    uint8_t currentTurn;
+    uint8_t lastSrc;
+    uint8_t lastDst;
+    uint8_t board[BOARD_CELL_COUNT];
 };
-
-enum DifficultyLevel {
-    DIFF_EASY = 1,
-    DIFF_MEDIUM = 2,
-    DIFF_HARD = 3
-};
+#pragma pack(pop)
 
 struct MoveRecord {
     int moveVal;
@@ -76,6 +64,9 @@ public:
     static int SqToFileX(int sq) { return sq & 15; }
     static int SqToRankY(int sq) { return sq >> 4; }
 
+    static int IndexToSq(uint8_t idx);
+    static uint8_t SqToIndex(int sq);
+
 private:
     std::array<int, 256> m_squares;
     int m_side;
@@ -88,41 +79,23 @@ private:
 class JungleEvaluator {
 public:
     static int Evaluate(const JungleBoard& board);
-
-private:
-    static int EvaluateMaterial(const JungleBoard& board);
-    static int EvaluateDenProximity(const JungleBoard& board);
-    static int EvaluateRiverControl(const JungleBoard& board);
-    static int EvaluateTrapSafety(const JungleBoard& board);
 };
 
 class AlphaBetaSearcher {
 public:
     AlphaBetaSearcher();
-    int SearchBestMove(JungleBoard& board, DifficultyLevel level, int timeLimitMs);
+    int SearchBestMove(JungleBoard& board, int depth);
 
 private:
     std::array<int, 65536> m_historyTable;
-
     int QuiescenceSearch(JungleBoard& board, int alpha, int beta, int depth);
     int AlphaBeta(JungleBoard& board, int depth, int alpha, int beta, bool isRoot = false);
 };
 
+//对外导出的通用数据与操作接口，方便后续直接对接UE。
 void Engine_Startup();
-int  Engine_GetTurn();
-int  Engine_GetPiece(int sq);
-TerrainType Engine_GetTerrain(int sq);
-int  Engine_GetSelectedSq();
-void Engine_ClearSelectedSq();
-int  Engine_GetLastMove();
-bool Engine_IsGameOver();
-
-MoveResult Engine_ClickSquare(int sq, std::string& outMsg);
-MoveResult Engine_AiMove(int& outMove, std::string& outMsg);
-void Engine_SetDifficulty(DifficultyLevel level);
-DifficultyLevel Engine_GetDifficulty();
-
-inline int Engine_CoordToSq(int x, int y) { return JungleBoard::CoordToSq(x, y); }
-inline int Engine_SqToFileX(int sq) { return JungleBoard::SqToFileX(sq); }
-inline int Engine_SqToRankY(int sq) { return JungleBoard::SqToRankY(sq); }
-const char* Engine_GetPieceName(int pc);
+void Engine_GetSnapshot(MsgBoardSnapshot& outSnapshot);
+bool Engine_TryMove(uint8_t srcIdx, uint8_t dstIdx);
+bool Engine_TriggerAi();
+TerrainType Engine_GetTerrainByIndex(uint8_t idx);
+const char* Engine_GetPieceName(uint8_t pc);

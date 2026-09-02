@@ -15,12 +15,7 @@ protected:
 
 protected:
     HICON m_hIcon;
-    CString m_strStatus;
-
-    CRect m_rcBtnEasy;
-    CRect m_rcBtnMedium;
-    CRect m_rcBtnHard;
-    CRect m_rcBtnReset;
+    int m_selectedIdx;
 
     void DrawMoveArrow(CDC* pDC, CPoint ptStart, CPoint ptEnd);
 
