@@ -33,8 +33,8 @@
 ## 一、基础编码与坐标定义
 
 ### 1. 棋盘坐标映射
-* 棋盘为 $9$ 行 $\times 7$ 列，共 $63$ 个有效格子（`0 ~ 62`）。
-* **换算公式**：`Index = Row * 7 + Col`（Row: 0～8, Col: 0～6）。
+* 棋盘为 $7$ 行 $\times 9$ 列，共 $63$ 个有效格子（`0 ~ 62`）。
+* **换算公式**：`Index = Row * 9 + Col`（Row: 0～6, Col: 0～8）。
 
 ### 2. 棋子编码（1 Byte）
 * `0`：空格（无棋子）
@@ -97,6 +97,12 @@ struct MsgMovePiece {
 
 双机直连时，房主端（Host）作为规则权威裁决端，客机（Guest）只同步操作。
 
+* 默认监听端口：`9002`（可在界面修改）。
+* Host 固定为红方并先手，Guest 固定为蓝方并后手。
+* `MsgID` 和 `Length` 均使用网络字节序（大端）；TCP 接收端按 `Length` 处理拆包和粘包。
+* 当前版本支持一局一连接，断线后不续局，重新创建或加入房间会重置棋局。
+* Host 会忽略无效的握手连接并继续等待；已进入对局后若 Guest 提交非法或不同步走子，则主动断开以防止双方局面分叉。
+
 ### 1. 握手与连接
 * **请求**：`NET_JOIN_REQ`（MsgID = `0x0010`，Guest $\rightarrow$ Host）
 * **响应**：`NET_JOIN_ACK`（MsgID = `0x0011`，Host $\rightarrow$ Guest）
@@ -124,6 +130,17 @@ struct NetMoveSync {
 > 1. 客机玩家走子：Guest_UE $\rightarrow$ Guest_MFC $\rightarrow$ 发送 `NET_MOVE_SYNC` 给 Host_MFC。
 > 2. Host_MFC 校验该走子合法后，更新主机棋盘，并给 Guest_MFC 回传确认的 `NET_MOVE_SYNC`。
 > 3. 双方 MFC 内部棋盘各自更新，两端的 UE 在下一次轮询时自动画出最新棋盘。
+
+### 3. 局域网对战使用方法
+
+> 构建环境：Windows + Visual Studio，并安装 `v141` C++ 工具集、MFC（x86/x64）和 Windows 10 SDK。
+
+1. 两台 Windows 电脑连入同一局域网（同一 Wi-Fi 或网线网络）并启动程序。
+2. 房主保留或修改端口，点击“创建房间（红）”，然后把界面显示的局域网 IP 和端口告诉另一方。
+3. 加入方填入房主 IP 和相同端口，点击“加入房间（蓝）”。
+4. 两边都显示“已连接”后即可开始；程序会自动限制只能在本方回合操作本方棋子。
+
+> Windows 首次监听端口时可能弹出防火墙提示，需允许程序访问“专用网络”。若要在同一台电脑测试，加入方可填写 `127.0.0.1`。联机包未加密，请仅在可信局域网中使用。
 
 ---
 
@@ -153,6 +170,8 @@ UE 前端                               MFC 后端 (人机/联机)
 animalChess/
 ├── engine.h            // 核心后端头文件：数据结构、规则定义与外部导出接口声明
 ├── engine.cpp          // 核心后端实现：棋盘状态管理、规则仲裁、局面评估与 AI 搜索
+├── LanNetwork.h       // 局域网协议、会话状态与界面通知定义
+├── LanNetwork.cpp     // TCP 房主/客机连接、握手、收发与异常处理
 ├── animalChessDlg.h    // 渲染前端头文件：对话框窗口与交互成员定义
 ├── animalChessDlg.cpp  // 渲染前端实现：基于 Snapshot 数据的无状态 GDI 绘图与点击响应
 ├── animalChess.h       // 应用程序类头文件
@@ -163,6 +182,8 @@ animalChess/
 ### 核心分层设计
 * **后端引擎层 (`engine.h` / `engine.cpp`)**：
   维护权威棋盘数据，实现走子规则判定、吃子与跳河约束、局面胜负裁决以及 Alpha-Beta 博弈搜索。对外部完全解耦，不依赖任何 MFC 界面库函数。
+* **局域网会话层 (`LanNetwork.h` / `LanNetwork.cpp`)**：
+  在后台线程完成房主监听、客机连接、握手与完整包收发，再通过带会话编号的 Windows 消息把走子交回界面线程，避免旧连接消息污染新棋局。
 * **前端展示层 (`animalChessDlg.h` / `animalChessDlg.cpp`)**：
   作为“纯表现层”客户端。不参与任何规则计算，仅通过 `Engine_GetSnapshot` 获取 63 字节的棋盘全量快照进行渲染，并将玩家的落子请求（起点和终点索引）通过 `Engine_TryMove` 提交给后端。**后续接入 Unreal Engine 时，只需将该文件内的渲染逻辑用 UE 的 Actor / Widget 替换即可。**
 
@@ -222,7 +243,13 @@ struct MsgBoardSnapshot {
 
 ---
 
-### 3. `bool Engine_TryMove(uint8_t srcIdx, uint8_t dstIdx)`
+### 3. `bool Engine_IsLegalMove(uint8_t srcIdx, uint8_t dstIdx)`
+* **功能**：无副作用地检查一步走子是否合法。
+* **说明**：不会修改棋盘、回合或历史记录；联机 Guest 在向 Host 提交请求前使用此接口预检。
+
+---
+
+### 4. `bool Engine_TryMove(uint8_t srcIdx, uint8_t dstIdx)`
 * **功能**：提交走子请求。
 * **参数**：
   * `srcIdx` [输入]：移动起点格子索引（`0 ~ 62`）。
@@ -233,7 +260,7 @@ struct MsgBoardSnapshot {
 
 ---
 
-### 4. `bool Engine_TriggerAi()`
+### 5. `bool Engine_TriggerAi()`
 * **功能**：触发本地 AI 计算并执行一步棋。
 * **返回值**：
   * `true`：AI 成功完成走子并更新棋盘。
@@ -242,7 +269,7 @@ struct MsgBoardSnapshot {
 
 ---
 
-### 5. `TerrainType Engine_GetTerrainByIndex(uint8_t idx)`
+### 6. `TerrainType Engine_GetTerrainByIndex(uint8_t idx)`
 * **功能**：查询指定格子的地形类型。
 * **参数**：
   * `idx` [输入]：格子索引（`0 ~ 62`）。
@@ -250,7 +277,7 @@ struct MsgBoardSnapshot {
 
 ---
 
-### 6. `const char* Engine_GetPieceName(uint8_t pc)`
+### 7. `const char* Engine_GetPieceName(uint8_t pc)`
 * **功能**：获取棋子对应的中文字符串。
 * **参数**：
   * `pc` [输入]：棋子数值（`0 ~ 24`）。

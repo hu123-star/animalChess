@@ -421,6 +421,15 @@ static AlphaBetaSearcher g_searcher;
 static int g_lastMove = 0;
 static uint8_t g_gameStatus = 0;
 
+static void UpdateGameStatusAfterMove(int movingSide) {
+    if (g_board.IsMate()) {
+        g_gameStatus = (movingSide == 0) ? 1 : 2;
+    }
+    else if (g_board.IsRepetition()) {
+        g_gameStatus = 3;
+    }
+}
+
 void Engine_Startup() {
     g_board.Reset();
     g_lastMove = 0;
@@ -446,24 +455,27 @@ void Engine_GetSnapshot(MsgBoardSnapshot& outSnapshot) {
     }
 }
 
-bool Engine_TryMove(uint8_t srcIdx, uint8_t dstIdx) {
+bool Engine_IsLegalMove(uint8_t srcIdx, uint8_t dstIdx) {
+    if (srcIdx >= BOARD_CELL_COUNT || dstIdx >= BOARD_CELL_COUNT) return false;
     if (g_gameStatus != 0) return false;
 
     int src = JungleBoard::IndexToSq(srcIdx);
     int dst = JungleBoard::IndexToSq(dstIdx);
-    int mv = MOVE(src, dst);
 
-    if (!g_board.IsLegalMove(mv)) return false;
+    return g_board.IsLegalMove(MOVE(src, dst));
+}
+
+bool Engine_TryMove(uint8_t srcIdx, uint8_t dstIdx) {
+    if (!Engine_IsLegalMove(srcIdx, dstIdx)) return false;
+
+    int src = JungleBoard::IndexToSq(srcIdx);
+    int dst = JungleBoard::IndexToSq(dstIdx);
+    int mv = MOVE(src, dst);
+    int movingSide = g_board.GetSide();
 
     g_board.MakeMove(mv);
     g_lastMove = mv;
-
-    if (g_board.IsMate()) {
-        g_gameStatus = 1;
-    }
-    else if (g_board.IsRepetition()) {
-        g_gameStatus = 3;
-    }
+    UpdateGameStatusAfterMove(movingSide);
 
     return true;
 }
@@ -471,21 +483,16 @@ bool Engine_TryMove(uint8_t srcIdx, uint8_t dstIdx) {
 bool Engine_TriggerAi() {
     if (g_gameStatus != 0 || g_board.GetSide() != 1) return false;
 
+    int movingSide = g_board.GetSide();
     int mv = g_searcher.SearchBestMove(g_board, 4);
     if (mv == 0) {
-        g_gameStatus = 1;
+        g_gameStatus = (movingSide == 0) ? 2 : 1;
         return true;
     }
 
     g_lastMove = mv;
     g_board.MakeMove(mv);
-
-    if (g_board.IsMate()) {
-        g_gameStatus = 2;
-    }
-    else if (g_board.IsRepetition()) {
-        g_gameStatus = 3;
-    }
+    UpdateGameStatusAfterMove(movingSide);
 
     return true;
 }
