@@ -51,8 +51,8 @@ protected:
 private:
     enum {
         IDC_GAME_RESTART = 0x6301,   // 重新开局（仅人机模式）
-        IDC_GAME_BACK    = 0x6302,   // 返回大厅
-        GAME_TIMER_AI    = 0x11,     // AI 思考轮询定时器
+        IDC_GAME_BACK = 0x6302,   // 返回大厅
+        GAME_TIMER_AI = 0x11,     // AI 思考轮询定时器
     };
 
     GameLaunchInfo m_launch;

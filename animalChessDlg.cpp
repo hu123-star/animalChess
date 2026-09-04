@@ -94,7 +94,9 @@ BOOL CanimalChessDlg::OnInitDialog()
     SetIcon(m_hIcon, TRUE);
     SetIcon(m_hIcon, FALSE);
 
-    SetWindowPos(NULL, 0, 0, 680, 560, SWP_NOMOVE | SWP_NOZORDER);
+    // 棋盘由父窗口双缓冲绘制，排除子控件区域可避免状态刷新时覆盖右侧控件。
+    ModifyStyle(0, WS_CLIPCHILDREN);
+    SetWindowPos(NULL, 0, 0, 930, 560, SWP_NOMOVE | SWP_NOZORDER);
 
     // ---------- 记录本局模式参数 ----------
     m_aiMode = (m_launch.mode == GAME_MODE_AI);
@@ -375,6 +377,11 @@ void CanimalChessDlg::OnLButtonDown(UINT nFlags, CPoint point)
     {
         CRect wr;
         GetWindowRect(&wr);
+    }
+
+    if (point.x < OFFSET_X || point.y < OFFSET_Y) {
+        CDialogEx::OnLButtonDown(nFlags, point);
+        return;
     }
 
     int col = (point.x - OFFSET_X) / GRID_SIZE;

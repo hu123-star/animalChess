@@ -108,6 +108,7 @@ private:
 //对外导出的通用数据与操作接口，方便后续直接对接UE。
 void Engine_Startup();
 void Engine_GetSnapshot(MsgBoardSnapshot& outSnapshot);
+bool Engine_IsLegalMove(uint8_t srcIdx, uint8_t dstIdx);
 bool Engine_TryMove(uint8_t srcIdx, uint8_t dstIdx);
 bool Engine_TriggerAi();
 TerrainType Engine_GetTerrainByIndex(uint8_t idx);

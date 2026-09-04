@@ -528,19 +528,29 @@ void Engine_GetSnapshot(MsgBoardSnapshot& outSnapshot) {
     }
 }
 
-bool Engine_TryMove(uint8_t srcIdx, uint8_t dstIdx) {
+bool Engine_IsLegalMove(uint8_t srcIdx, uint8_t dstIdx) {
+    if (srcIdx >= BOARD_CELL_COUNT || dstIdx >= BOARD_CELL_COUNT) return false;
     std::lock_guard<std::mutex> lk(g_engineMtx);
     if (g_gameStatus != 0) return false;
 
     int src = JungleBoard::IndexToSq(srcIdx);
     int dst = JungleBoard::IndexToSq(dstIdx);
-    int mv = MOVE(src, dst);
 
-    if (!g_board.IsLegalMove(mv)) return false;
+    return g_board.IsLegalMove(MOVE(src, dst));
+}
+
+bool Engine_TryMove(uint8_t srcIdx, uint8_t dstIdx) {
+    if (!Engine_IsLegalMove(srcIdx, dstIdx)) return false;
+
+    std::lock_guard<std::mutex> lk(g_engineMtx);
+    int src = JungleBoard::IndexToSq(srcIdx);
+    int dst = JungleBoard::IndexToSq(dstIdx);
+    int mv = MOVE(src, dst);
+    int movingSide = g_board.GetSide();
 
     g_board.MakeMove(mv);
     g_lastMove = mv;
-    EngineFinishMoveLocked(1);   // 红方(玩家)走出绝杀则红胜
+    EngineFinishMoveLocked(movingSide == 0 ? 1 : 2);   // 无论红方还是蓝方绝杀，均正确记录胜利方
 
     return true;
 }
