@@ -36,6 +36,9 @@
     <ClInclude Include="engine.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="LanNetwork.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="animalChess.cpp">
@@ -48,6 +51,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="engine.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="LanNetwork.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
