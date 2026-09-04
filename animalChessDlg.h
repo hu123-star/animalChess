@@ -30,6 +30,23 @@ protected:
     HICON m_hIcon;
     int m_selectedIdx;
 
+    CButton m_lanGroup;
+    CStatic m_addressLabel;
+    CEdit m_addressEdit;
+    CStatic m_portLabel;
+    CEdit m_portEdit;
+    CButton m_localAiButton;
+    CButton m_hostButton;
+    CButton m_joinButton;
+    CButton m_disconnectButton;
+    CStatic m_networkStatus;
+
+    LanSession m_lanSession;
+    GameMode m_gameMode;
+    bool m_waitingForGuestConfirmation;
+    uint8_t m_pendingSrc;
+    uint8_t m_pendingDst;
+
     void DrawMoveArrow(CDC* pDC, CPoint ptStart, CPoint ptEnd);
     void StartNewGame();                    // 引擎复位 + UI 复位
     bool IsMyColor(uint8_t pc) const;       // pc 是否属于本机阵营

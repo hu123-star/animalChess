@@ -384,6 +384,11 @@ void CanimalChessDlg::OnLButtonDown(UINT nFlags, CPoint point)
         return;
     }
 
+    if (point.x < OFFSET_X || point.y < OFFSET_Y) {
+        CDialogEx::OnLButtonDown(nFlags, point);
+        return;
+    }
+
     int col = (point.x - OFFSET_X) / GRID_SIZE;
     int row = (point.y - OFFSET_Y) / GRID_SIZE;
 
@@ -437,6 +442,32 @@ void CanimalChessDlg::OnLButtonDown(UINT nFlags, CPoint point)
                     else {
                         Invalidate(FALSE);   // 非法走子被忽略
                     }
+                    else if (m_gameMode == GameMode::LanHost) {
+                        // 房主先在权威棋盘执行红方走子，再把已确认走子广播给客机。
+                        if (Engine_TryMove(src, clickedIdx)) {
+                            if (!m_lanSession.SendMove(src, clickedIdx)) {
+                                SetNetworkStatus(_T("状态：红方走子已执行，但发送失败"));
+                            }
+                            Invalidate(FALSE);
+                        }
+                    }
+                    else {
+                        // 客机只做无副作用预检；必须等房主回传确认后才修改棋盘。
+                        if (Engine_IsLegalMove(src, clickedIdx)) {
+                            if (m_lanSession.SendMove(src, clickedIdx)) {
+                                m_waitingForGuestConfirmation = true;
+                                m_pendingSrc = src;
+                                m_pendingDst = clickedIdx;
+                                SetNetworkStatus(_T("状态：走子已发送，等待房主确认..."));
+                            }
+                            else {
+                                SetNetworkStatus(_T("状态：走子发送失败"));
+                            }
+                            Invalidate(FALSE);
+                        }
+                    }
+                    // 非法走子同样要清除刚刚取消的选中框。
+                    Invalidate(FALSE);
                 }
             }
         }

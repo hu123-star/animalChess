@@ -13,6 +13,16 @@
 #include <ws2tcpip.h>
 
 // 添加要在此处预编译的标头
+// MFC must be included before Windows.h. The lean Windows headers omit the
+// legacy Winsock 1 declarations, so Winsock 2 can be included immediately after.
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include "framework.h"
+#include <winsock2.h>
+#include <ws2tcpip.h>
 
 #endif //PCH_H
